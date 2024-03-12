@@ -3,7 +3,6 @@
 package otp
 
 import (
-	"github.com/lukechampine/fastxor"
 	"io"
 )
 
@@ -28,7 +27,9 @@ func (m *MyReader) Read(p []byte) (n int, e error) {
 		if err != nil {
 			return 0, err
 		}
-		fastxor.Bytes(curP, curBlock[:toXor], rndBlock[:toXor])
+		for i := 0; i < toXor; i++ {
+			curP[i] = curBlock[i] ^ rndBlock[i]
+		}
 		curP = curP[toXor:]
 		n += toXor
 	}
@@ -56,7 +57,9 @@ func (m *MyWriter) Write(p []byte) (n int, e error) {
 		toXor := min(len(curP), blockSize)
 		curN, _ = m.randomizer.Read(rndBlock)
 		toXor = min(toXor, curN)
-		fastxor.Bytes(curBlock, curP[:toXor], rndBlock[:toXor])
+		for i := 0; i < toXor; i++ {
+			curBlock[i] = curP[i] ^ rndBlock[i]
+		}
 		curN, e = m.writer.Write(curBlock[:toXor])
 		toXor = min(toXor, curN)
 		curP = curP[toXor:]
