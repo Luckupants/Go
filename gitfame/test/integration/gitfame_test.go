@@ -2,15 +2,14 @@ package integration
 
 import (
 	"bytes"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"testing"
-
-	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
 
 	"gitlab.com/slon/shad-go/tools/testtool"
 )
