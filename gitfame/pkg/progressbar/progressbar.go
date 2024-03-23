@@ -1,4 +1,4 @@
-package progress_bar
+package progressbar
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 )
 
 // Хотел воспользоваться библиотекой на гитхабе, но уверен проверяющая система ее не подгрузит...
+
 var Red = "\033[31m"
 
 type ProgressBar struct {

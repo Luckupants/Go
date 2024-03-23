@@ -3,10 +3,10 @@ package core
 import (
 	"errors"
 	"gitlab.com/slon/shad-go/gitfame/internal/information"
-	"gitlab.com/slon/shad-go/gitfame/internal/input_reader"
-	"gitlab.com/slon/shad-go/gitfame/internal/organize_data"
-	"gitlab.com/slon/shad-go/gitfame/internal/print_data"
-	"gitlab.com/slon/shad-go/gitfame/pkg/progress_bar"
+	"gitlab.com/slon/shad-go/gitfame/internal/inputreader"
+	"gitlab.com/slon/shad-go/gitfame/internal/organizedata"
+	"gitlab.com/slon/shad-go/gitfame/internal/printdata"
+	"gitlab.com/slon/shad-go/gitfame/pkg/progressbar"
 	"maps"
 	"os/exec"
 	"strconv"
@@ -75,7 +75,7 @@ type channelInfo struct {
 	answer map[string]*information.FameInfo
 }
 
-func fame(files []string, info information.InputInfo, answer map[string]*information.FameInfo, pb *progress_bar.ProgressBar) error {
+func fame(files []string, info information.InputInfo, answer map[string]*information.FameInfo, pb *progressbar.ProgressBar) error {
 	errorChannel := make(chan error, *info.FlagGoroutines)
 	tasksChannel := make(chan channelInfo, *info.FlagGoroutines)
 	resultsChannel := make(chan map[string]*information.FameInfo, len(files))
@@ -162,23 +162,23 @@ func blame(info information.InputInfo, file string) (map[string]*information.Fam
 	return result, nil
 }
 
-func Execute(info information.InputInfo, pb *progress_bar.ProgressBar) error {
+func Execute(info information.InputInfo, pb *progressbar.ProgressBar) error {
 	pb.SendMessage("Loading files...")
-	files, err := input_reader.GetFiles(info)
+	files, err := inputreader.GetFiles(info)
 	if err != nil {
 		return err
 	}
 	pb.SendMessage("Filtering...")
-	files = input_reader.FilterExtensions(files, *info.FlagExtensions)
-	files, err = input_reader.FilterLanguages(files, info)
+	files = inputreader.FilterExtensions(files, *info.FlagExtensions)
+	files, err = inputreader.FilterLanguages(files, info)
 	if err != nil {
 		return err
 	}
-	files, err = input_reader.ExcludePatterns(files, *info.FlagExclude, *info.FlagPath)
+	files, err = inputreader.ExcludePatterns(files, *info.FlagExclude, *info.FlagPath)
 	if err != nil {
 		return err
 	}
-	files, err = input_reader.Restrict(files, *info.FlagRestrict, *info.FlagPath)
+	files, err = inputreader.Restrict(files, *info.FlagRestrict, *info.FlagPath)
 	if err != nil {
 		return err
 	}
@@ -189,11 +189,11 @@ func Execute(info information.InputInfo, pb *progress_bar.ProgressBar) error {
 		return err
 	}
 	pb.SendMessage("Preparing output...")
-	ans, err := organize_data.PrepareForOutput(answer, info)
+	ans, err := organizedata.PrepareForOutput(answer, info)
 	if err != nil {
 		return err
 	}
-	err = print_data.PrintAnswer(ans, info)
+	err = printdata.PrintAnswer(ans, info)
 	if err != nil {
 		return err
 	}

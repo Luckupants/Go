@@ -1,4 +1,4 @@
-package organize_data
+package organizedata
 
 import (
 	"errors"

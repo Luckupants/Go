@@ -1,4 +1,4 @@
-package print_data
+package printdata
 
 import (
 	"encoding/csv"
