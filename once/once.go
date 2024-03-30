@@ -4,16 +4,21 @@ package once
 
 // Once describes an object that will perform exactly one action.
 type Once struct {
+	allowed chan bool
 }
 
 // New creates Once.
 func New() *Once {
-	return nil
+	answer := Once{make(chan bool, 1)}
+	answer.allowed <- true
+	return &answer
 }
 
 // Do calls the function f if and only if Do is being called for the
 // first time for this instance of Once. In other words, given
-// 	once := New()
+//
+//	once := New()
+//
 // if once.Do(f) is called multiple times, only the first call will invoke f,
 // even if f has a different value in each invocation. A new instance of
 // Once is required for each function to execute.
@@ -25,7 +30,11 @@ func New() *Once {
 //
 // If f panics, Do considers it to have returned; future calls of Do return
 // without calling f.
-//
 func (o *Once) Do(f func()) {
-
+	allowed := <-o.allowed
+	o.allowed <- false
+	if !allowed {
+		return
+	}
+	f()
 }
