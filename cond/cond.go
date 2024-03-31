@@ -2,6 +2,8 @@
 
 package cond
 
+import "time"
+
 // A Locker represents an object that can be locked and unlocked.
 type Locker interface {
 	Lock()
@@ -16,15 +18,17 @@ type Locker interface {
 // which must be held when changing the condition and
 // when calling the Wait method.
 type Cond struct {
-	L       Locker
-	free    chan struct{}
-	counter chan int
+	L             Locker
+	queue         []*chan struct{}
+	lock          chan struct{}
+	waitingAmount chan int
 }
 
 // New returns a new Cond with Locker l.
 func New(l Locker) *Cond {
-	answer := Cond{L: l, free: make(chan struct{}, 1), counter: make(chan int, 1)}
-	answer.counter <- 0
+	answer := Cond{L: l, lock: make(chan struct{}, 1), waitingAmount: make(chan int, 1)}
+	answer.waitingAmount <- 0
+	answer.lock <- struct{}{}
 	return &answer
 }
 
@@ -45,9 +49,12 @@ func New(l Locker) *Cond {
 //	c.L.Unlock()
 func (c *Cond) Wait() {
 	c.L.Unlock()
-	count := <-c.counter
-	c.counter <- count + 1
-	<-c.free
+	<-c.lock
+	waiting := make(chan struct{}, 1)
+	c.queue = append(c.queue, &waiting)
+	c.lock <- struct{}{}
+	c.waitingAmount <- (<-c.waitingAmount) + 1
+	<-waiting
 	c.L.Lock()
 }
 
@@ -56,9 +63,16 @@ func (c *Cond) Wait() {
 // It is allowed but not required for the caller to hold c.L
 // during the call.
 func (c *Cond) Signal() {
-	count := <-c.counter
-	c.counter <- count - 1
-	c.free <- struct{}{}
+	<-c.lock
+	if len(c.queue) == 0 {
+		c.lock <- struct{}{}
+		return
+	}
+	toWake := c.queue[0]
+	c.queue = c.queue[1:]
+	c.lock <- struct{}{}
+	*toWake <- struct{}{}
+	c.waitingAmount <- (<-c.waitingAmount) - 1
 }
 
 // Broadcast wakes all goroutines waiting on c.
@@ -66,9 +80,21 @@ func (c *Cond) Signal() {
 // It is allowed but not required for the caller to hold c.L
 // during the call.
 func (c *Cond) Broadcast() {
-	for count := <-c.counter; count > 0; count = <-c.counter {
-		c.counter <- count - 1
-		c.free <- struct{}{}
+	for {
+		<-c.lock
+		for len(c.queue) > 0 {
+			toWake := c.queue[0]
+			*toWake <- struct{}{}
+			c.waitingAmount <- (<-c.waitingAmount) - 1
+			c.queue = c.queue[1:]
+		}
+		c.lock <- struct{}{}
+		time.Sleep(time.Millisecond)
+		<-c.lock
+		if len(c.queue) == 0 {
+			c.lock <- struct{}{}
+			return
+		}
+		c.lock <- struct{}{}
 	}
-	c.counter <- 0
 }
