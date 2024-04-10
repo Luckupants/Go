@@ -23,12 +23,12 @@ func (l *KeyLock) LockKeys(keys []string, cancel <-chan struct{}) (canceled bool
 	keys = copyKeys
 	unlock = func() {
 		l.mx.Lock()
-		for i := len(keys) - 1; i >= 0; i-- {
-			l.mutexes[keys[i]] <- struct{}{}
+		for _, key := range keys {
+			l.mutexes[key] <- struct{}{}
 		}
 		l.mx.Unlock()
 	}
-	for _, key := range keys {
+	for i, key := range keys {
 		l.mx.Lock()
 		if _, ok := l.mutexes[key]; !ok {
 			l.mutexes[key] = make(chan struct{}, 1)
@@ -39,7 +39,12 @@ func (l *KeyLock) LockKeys(keys []string, cancel <-chan struct{}) (canceled bool
 		select {
 		case <-mutex:
 		case <-cancel:
-			return true, unlock
+			l.mx.Lock()
+			for j := 0; j < i; j++ {
+				l.mutexes[keys[j]] <- struct{}{}
+			}
+			l.mx.Unlock()
+			return true, func() {}
 		}
 	}
 	return false, unlock
