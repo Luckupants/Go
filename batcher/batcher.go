@@ -9,16 +9,20 @@ import (
 	"time"
 )
 
+type BatchInfo struct {
+	result       interface{}
+	isCalculated chan struct{}
+	timeout      context.Context
+}
+
 type Batcher struct {
-	entry         chan struct{}
 	mx            sync.Mutex
+	entry         sync.Cond
+	entryAllowed  bool
 	loadersAmount int
-	timeout       context.Context
-	cancel        context.CancelFunc
 	enoughLoaders chan struct{}
-	result        interface{}
 	object        *slow.Value
-	calculated    chan struct{}
+	curBatchInfo  *BatchInfo
 }
 
 const (
@@ -27,40 +31,46 @@ const (
 )
 
 func NewBatcher(v *slow.Value) *Batcher {
-	answer := &Batcher{entry: make(chan struct{}), object: v}
-	close(answer.entry)
+	answer := &Batcher{entryAllowed: true, object: v}
+	answer.entry = *sync.NewCond(&answer.mx)
 	return answer
 }
 
 func (b *Batcher) Load() interface{} {
-	<-b.entry
 	b.mx.Lock()
+	for !b.entryAllowed {
+		b.entry.Wait()
+	}
 	oldAmount := b.loadersAmount
 	b.loadersAmount++
 	switch b.loadersAmount {
 	case 1:
-		b.timeout, b.cancel = context.WithTimeout(context.Background(), timeOut)
+		b.curBatchInfo = &BatchInfo{isCalculated: make(chan struct{})}
+		var cancel context.CancelFunc
+		b.curBatchInfo.timeout, cancel = context.WithTimeout(context.Background(), timeOut)
+		defer cancel()
 		b.enoughLoaders = make(chan struct{})
-		b.calculated = make(chan struct{})
 	case queueSize:
 		close(b.enoughLoaders)
 	}
+	curInfo := b.curBatchInfo
 	b.mx.Unlock()
-	select {
-	case <-b.enoughLoaders:
-	case <-b.timeout.Done():
-	}
 	if oldAmount == 0 {
-		b.entry = make(chan struct{})
-		res := b.object.Load()
-		b.result = res
-		close(b.calculated)
+		select {
+		case <-b.enoughLoaders:
+		case <-curInfo.timeout.Done():
+		}
 		b.mx.Lock()
+		b.entryAllowed = false
 		b.loadersAmount = 0
+		res := b.object.Load()
+		curInfo.result = res
+		close(curInfo.isCalculated)
+		b.entryAllowed = true
+		b.entry.Broadcast()
 		b.mx.Unlock()
-		close(b.entry)
 		return res
 	}
-	<-b.calculated
-	return b.result
+	<-curInfo.isCalculated
+	return curInfo.result
 }
