@@ -295,7 +295,7 @@ func TestPubSub_close(t *testing.T) {
 	p := NewPubSub()
 
 	wg := sync.WaitGroup{}
-	wg.Add(10)
+	wg.Add(1)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
