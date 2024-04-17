@@ -8,7 +8,6 @@ import (
 	"errors"
 	"sync"
 	"sync/atomic"
-	"time"
 )
 
 var _ Subscription = (*MySubscription)(nil)
@@ -26,6 +25,11 @@ func (s *MySubscription) Unsubscribe() {
 }
 
 var _ PubSub = (*MyPubSub)(nil)
+
+type Node struct {
+	cb   MsgHandler
+	done chan struct{}
+}
 
 type MyPubSub struct {
 	subscriptions map[string]*list.List
@@ -48,7 +52,8 @@ func (p *MyPubSub) Subscribe(subj string, cb MsgHandler) (Subscription, error) {
 		p.subscriptions[subj] = &list.List{}
 	}
 	l := p.subscriptions[subj]
-	l.PushBack(cb)
+	l.PushBack(&Node{cb: cb, done: make(chan struct{}, 1)})
+	l.Back().Value.(*Node).done <- struct{}{}
 	sub := &MySubscription{mx: &p.mx, list: l, element: l.Back()}
 	return sub, nil
 }
@@ -61,18 +66,15 @@ func (p *MyPubSub) Publish(subj string, msg interface{}) error {
 	defer p.mx.Unlock()
 	l := p.subscriptions[subj]
 	for cur := l.Front(); cur != nil; cur = cur.Next() {
-		cur := cur
-		timer, closeTimer := context.WithTimeout(context.Background(), time.Millisecond*10)
-		done := make(chan struct{})
+		curNode := cur.Value.(*Node)
+		toWait := curNode.done
+		newDone := make(chan struct{}, 1)
+		curNode.done = newDone
 		go func() {
-			cur.Value.(MsgHandler)(msg)
-			close(done)
+			<-toWait
+			curNode.cb(msg)
+			newDone <- struct{}{}
 		}()
-		select {
-		case <-timer.Done():
-		case <-done:
-		}
-		closeTimer()
 		if p.isClosed.Load() {
 			select {
 			case <-p.ctx.Done():
