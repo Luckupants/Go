@@ -15,14 +15,14 @@ type ProgressBar struct {
 	Delta    int
 }
 
-func (pb ProgressBar) SendMessage(message string) {
+func (pb *ProgressBar) SendMessage(message string) {
 	_, _ = fmt.Fprintln(os.Stderr, message) // не могу в stdout писать...
 }
 
-func (pb ProgressBar) UpdateProgress(progress int) {
+func (pb *ProgressBar) UpdateProgress(progress int) {
 	if progress > pb.progress+pb.Delta {
-		pb.progress = progress / pb.Delta * pb.Delta
+		pb.progress = (progress / pb.Delta) * pb.Delta
 		_, _ = fmt.Fprintln(os.Stderr, "cur progress:") // не могу в stdout писать...
-		_, _ = fmt.Fprintln(os.Stderr, Red+strings.Repeat("▆", pb.progress/pb.Delta))
+		_, _ = fmt.Fprintln(os.Stderr, Red+strings.Repeat("▆", pb.progress/pb.Delta)+strings.Repeat(" ", (100-pb.progress)/pb.Delta), pb.progress, "%")
 	}
 }

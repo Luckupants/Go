@@ -22,7 +22,7 @@ func skipHeader(data []string) []string {
 	return data
 }
 
-func parseBlame(answer map[string]*information.FameInfo, data []string, seenCommits map[string]string, seenNames map[string]struct{}, info information.InputInfo) ([]string, error) {
+func parseBlame(answer map[string]information.FameInfo, data []string, seenCommits map[string]string, seenNames map[string]struct{}, info information.InputInfo) ([]string, error) {
 	linesAmount, err := strconv.Atoi(strings.Split(data[0], " ")[3])
 	if err != nil {
 		return nil, errors.Join(err, errors.New("error parsing git blame"))
@@ -43,7 +43,7 @@ func parseBlame(answer map[string]*information.FameInfo, data []string, seenComm
 	}
 	seenNames[name] = struct{}{}
 	if _, ok := answer[name]; !ok {
-		answer[name] = &information.FameInfo{Name: name, Commits: make(map[string]struct{})}
+		answer[name] = information.FameInfo{Name: name, Commits: make(map[string]struct{})}
 	}
 	answer[name].Commits[commit] = struct{}{}
 	answer[name].LinesAmount += linesAmount
@@ -76,36 +76,11 @@ type channelInfo struct {
 }
 
 func fame(files []string, info information.InputInfo, answer map[string]*information.FameInfo, pb *progressbar.ProgressBar) error {
-	errorChannel := make(chan error, *info.FlagGoroutines)
-	tasksChannel := make(chan channelInfo, *info.FlagGoroutines)
-	resultsChannel := make(chan map[string]*information.FameInfo, len(files))
-	defer close(errorChannel)
-	for i := 0; i < *info.FlagGoroutines; i++ {
-		go func() {
-			for {
-				task, ok := <-tasksChannel
-				if !ok {
-					break
-				}
-				result, err := blame(task.info, task.file)
-				if err != nil {
-					errorChannel <- err
-					break
-				}
-				resultsChannel <- result
-			}
-		}()
-	}
 	for _, file := range files {
-		tasksChannel <- channelInfo{info: info, file: file, answer: answer}
-	}
-	close(tasksChannel)
-	for i := 0; i < len(files); i++ {
-		if len(errorChannel) != 0 {
-			err := <-errorChannel
+		result, err := blame(info, file)
+		if err != nil {
 			return err
 		}
-		result := <-resultsChannel
 		for _, res := range result {
 			if _, ok := answer[res.Name]; !ok {
 				answer[res.Name] = res
@@ -115,11 +90,6 @@ func fame(files []string, info information.InputInfo, answer map[string]*informa
 				maps.Copy(answer[res.Name].Commits, res.Commits)
 			}
 		}
-		pb.UpdateProgress(i * 100 / len(files))
-	}
-	if len(errorChannel) != 0 {
-		err := <-errorChannel
-		return err
 	}
 	for _, val := range answer {
 		val.CommitsAmount = len(val.Commits)
@@ -149,7 +119,7 @@ func blame(info information.InputInfo, file string) (map[string]*information.Fam
 		result.FilesAmount++
 		return map[string]*information.FameInfo{name: &result}, nil
 	}
-	result := make(map[string]*information.FameInfo)
+	result := make(map[string]information.FameInfo)
 	for len(data) > 1 {
 		data, err = parseBlame(result, data, seenCommits, seenNames, info)
 		if err != nil {

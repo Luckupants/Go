@@ -3,14 +3,13 @@ package inputreader
 import (
 	"encoding/json"
 	"fmt"
+	"gitlab.com/slon/shad-go/gitfame/configs"
 	"gitlab.com/slon/shad-go/gitfame/internal/information"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
-
-	"gitlab.com/slon/shad-go/gitfame"
 )
 
 func GetFiles(info information.InputInfo) ([]string, error) {
@@ -64,7 +63,7 @@ type LanguageInfo struct {
 
 func FilterLanguages(fileNames []string, info information.InputInfo) ([]string, error) {
 	var langInfo []LanguageInfo
-	err := json.Unmarshal(gitfame.Languages, &langInfo)
+	err := json.Unmarshal(configs.Languages, &langInfo)
 	if err != nil {
 		return nil, err
 	}
