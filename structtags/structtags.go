@@ -32,7 +32,6 @@ func Unpack(req *http.Request, ptr interface{}) error {
 		if !ok {
 			continue
 		}
-
 		for _, value := range values {
 			if f.Kind() == reflect.Slice {
 				elem := reflect.New(f.Type().Elem()).Elem()
@@ -74,3 +73,15 @@ func populate(v reflect.Value, value string) error {
 	}
 	return nil
 }
+
+/*
+OLD:
+436
+843
+630
+
+NEW:
+-
+-
+-
+*/
