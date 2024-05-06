@@ -17,4 +17,5 @@ func DoInOrder[Noda interface {
 	DoInOrder((*root).Left(), cb)
 	cb(root)
 	DoInOrder((*root).Right(), cb)
+
 }
