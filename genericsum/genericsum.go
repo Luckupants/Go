@@ -22,6 +22,7 @@ func SortSlice[T constraints.Ordered](a []T) {
 				a[i], a[j] = a[j], a[i]
 			}
 		}
+
 	}
 }
 
